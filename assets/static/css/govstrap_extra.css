@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto');
+
+html {
+    background-color: #fff;
+}
+body {
+    margin-bottom: 350px;
+    padding-top: 43px;
+}
+
+.footer {
+    margin-top: 0;
+	text-shadow: none;
+    color: #34495e;
+    display: inline;
+}
+
+.navbar-fixed-bottom, .navbar-fixed-top {
+    position: absolute;
+}
+
+.body-header {
+    border-top: 10px solid #005ea5;
+}
+
+/* Add this style to your body header to expand it when you have content to go in the body header...*/
+.body-header-content {
+    min-height: 55px;
+    padding: 10px 0;
+    border-bottom: 1px solid #bfc1c3;
+}
+.navbar-header .api-title {
+    color: #fff;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2em;
+    font-weight: 700;
+}
+.rb {
+    border: 1px solid red;
+}
+@media (max-width: 900px) {
+    .navbar-header .api-title {
+        color: green;
+    }
+    .body-header {
+        margin-top: 22px;
+    }
+}
+.navbar a.navbar-brand {
+    padding-left: 55px;
+    text-decoration: none;
+    font-size: 27px;
+    font-weight: inherit;
+}
+.navbar a.navbar-brand span {
+    font-weight: 700;
+}
+
+.navbar {
+    padding: 0;
+}
+.navbar > .container       .navbar-brand,
+.navbar > .container-fluid .navbar-brand {
+    margin-left: 0;
+}
+.navbar li > a {
+    margin-top: 15px;
+}
+.navbar .row {
+    margin-top: 0px;
+    margin-bottom: 3px;
+}
+.navbar-right {
+    margin-top: 15px;
+}
+
+@media (min-width: 400px) {
+    .navbar-right {
+        float: right!important;
+        margin-right: -15px;
+    }
+}
+.userbar {
+    margin-top: 0;
+    margin-right: 0;
+}
+.navbar-nav > li > a {
+    display: inline;
+}
+
+.body-header > ul.navbar-nav > li > a { 
+    color: #005ea5;
+    padding-right: 0px;
+}
+
+.shadow {
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
+}
+
+.side-nav a,
+a.btn
+{
+    text-decoration: none;
+}
+
+.side-nav.affix {
+    position: relative;
+}
+.side-nav.affix, .side-nav.affix-bottom {
+    width: 99%;
+}
+
+a,
+a:link,
+a:visited {
+    color: #005ea5;
+}
+
+a.btn {
+    color: #fff;
+}
+
+.nav-sidebar a.nav-selected {
+    color: #000;
+}
+.nav-toggle.open {
+    color: inherit;
+}
+
+h1 {
+    font-size: 38px;
+}
+pre, code, pre code, td li, .attribute, td.resource {
+    color: #008000;
+    font-size: 15px;
+}
+.deactivate {
+    display: none;
+}
+.form-control {
+    border: 2px solid;
+}
+
+/*
+.form-control:focus {
+    border: 2px solid black;
+    outline: 3px solid rgb(255, 191, 71);
+    outline-offset: 0;
+}
+*/
+input:focus, textarea:focus, select:focus, button:focus {
+    border: 2px solid black;
+    outline: 3px solid rgb(255, 191, 71);
+    outline-offset: 0;
+}

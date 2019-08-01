@@ -81,6 +81,7 @@ type Info struct {
 type APIGroup struct {
 	ID                     string
 	Name                   string
+	Description            string
 	URL                    *url.URL
 	MethodNavigationByName bool
 	MethodSortBy           []string
@@ -376,11 +377,9 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 			groupingByTag = true
 		}
 
-		var name string // Will only populate if Tagging used in spec. processMethod overrides if needed.
-		name = tag.Name
-		if name == "" {
-			name = tag.Description
-		}
+		var name = tag.Name
+		var description = tag.Description
+
 		logger.Tracef(nil, "    - %s\n", name)
 
 		// If we're grouping by TAGs, then build the API at the tag level
@@ -388,6 +387,7 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 			api = &APIGroup{
 				ID:                     TitleToKebab(name),
 				Name:                   name,
+				Description:            description,
 				URL:                    u,
 				Info:                   &c.APIInfo,
 				MethodNavigationByName: methodNavByName,
@@ -409,6 +409,7 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 				api = &APIGroup{
 					ID:                     TitleToKebab(name),
 					Name:                   name,
+					Description:            description,
 					URL:                    u,
 					Info:                   &c.APIInfo,
 					MethodNavigationByName: methodNavByName,
@@ -688,11 +689,13 @@ func (c *APISpecification) processMethod(api *APIGroup, pathItem *spec.PathItem,
 	}
 	if api.Name == "" {
 		name := o.Summary
+		description := o.Description
 		if name == "" {
 			logger.Errorf(nil, "Error: Operation '%s' does not have an operationId or summary member.", id)
 			os.Exit(1)
 		}
 		api.Name = name
+		api.Description = description
 		api.ID = TitleToKebab(name)
 	}
 
