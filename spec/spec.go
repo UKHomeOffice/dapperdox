@@ -377,19 +377,19 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 		}
 
 		var name string // Will only populate if Tagging used in spec. processMethod overrides if needed.
-		name = tag.Description
+		name = tag.Name
 		if name == "" {
-			name = tag.Name
+			name = tag.Description
 		}
 		logger.Tracef(nil, "    - %s\n", name)
 
 		// If we're grouping by TAGs, then build the API at the tag level
 		if groupingByTag {
 			api = &APIGroup{
-				ID:   TitleToKebab(name),
-				Name: name,
-				URL:  u,
-				Info: &c.APIInfo,
+				ID:                     TitleToKebab(name),
+				Name:                   name,
+				URL:                    u,
+				Info:                   &c.APIInfo,
 				MethodNavigationByName: methodNavByName,
 				MethodSortBy:           methodSortBy,
 				Consumes:               apispec.Consumes,
@@ -407,10 +407,10 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 			// If not grouping by tag, then build the API at the path level
 			if !groupingByTag {
 				api = &APIGroup{
-					ID:   TitleToKebab(name),
-					Name: name,
-					URL:  u,
-					Info: &c.APIInfo,
+					ID:                     TitleToKebab(name),
+					Name:                   name,
+					URL:                    u,
+					Info:                   &c.APIInfo,
 					MethodNavigationByName: methodNavByName,
 					MethodSortBy:           methodSortBy,
 					Consumes:               apispec.Consumes,
