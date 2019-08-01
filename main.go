@@ -25,24 +25,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperdox/dapperdox/config"
-	"github.com/dapperdox/dapperdox/handlers/guides"
-	"github.com/dapperdox/dapperdox/handlers/home"
-	"github.com/dapperdox/dapperdox/handlers/reference"
-	"github.com/dapperdox/dapperdox/handlers/specs"
-	"github.com/dapperdox/dapperdox/handlers/static"
-	"github.com/dapperdox/dapperdox/handlers/timeout"
-	"github.com/dapperdox/dapperdox/logger"
-	"github.com/dapperdox/dapperdox/network"
-	"github.com/dapperdox/dapperdox/proxy"
-	"github.com/dapperdox/dapperdox/render"
-	"github.com/dapperdox/dapperdox/spec"
+	"github.com/UKHomeOffice/dapperdox/config"
+	"github.com/UKHomeOffice/dapperdox/handlers/guides"
+	"github.com/UKHomeOffice/dapperdox/handlers/home"
+	"github.com/UKHomeOffice/dapperdox/handlers/reference"
+	"github.com/UKHomeOffice/dapperdox/handlers/specs"
+	"github.com/UKHomeOffice/dapperdox/handlers/static"
+	"github.com/UKHomeOffice/dapperdox/handlers/timeout"
+	"github.com/UKHomeOffice/dapperdox/logger"
+	"github.com/UKHomeOffice/dapperdox/network"
+	"github.com/UKHomeOffice/dapperdox/proxy"
+	"github.com/UKHomeOffice/dapperdox/render"
+	"github.com/UKHomeOffice/dapperdox/spec"
 	"github.com/gorilla/pat"
 	"github.com/justinas/alice"
 	"github.com/justinas/nosurf"
 )
 
-var VERSION string = "1.2.1"
+var VERSION string = "beta"
 var tlsEnabled bool
 
 // ---------------------------------------------------------------------------

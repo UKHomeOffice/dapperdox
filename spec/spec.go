@@ -27,8 +27,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dapperdox/dapperdox/config"
-	"github.com/dapperdox/dapperdox/logger"
+	"github.com/UKHomeOffice/dapperdox/config"
+	"github.com/UKHomeOffice/dapperdox/logger"
 	//"github.com/davecgh/go-spew/spew"
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
@@ -1397,7 +1397,7 @@ func loadSpec(url string) (*loads.Document, error) {
 	}
 
 	//options := &spec.ExpandOptions{
-	//	RelativeBase: "/Users/csmith1/src/go/src/github.com/dapperdox/dapperdox-demo/specifications",
+	//	RelativeBase: "/Users/csmith1/src/go/src/github.com/UKHomeOffice/dapperdox-demo/specifications",
 	//}
 
 	// TODO Allow relative references https://github.com/go-openapi/spec/issues/14

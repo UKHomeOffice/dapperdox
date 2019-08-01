@@ -1,4 +1,4 @@
-# DapperDox&nbsp;&nbsp;&nbsp;[![Build Status](https://travis-ci.org/DapperDox/dapperdox.svg?branch=master)](https://travis-ci.org/DapperDox/dapperdox) [![Download](https://img.shields.io/badge/release-v1.1.1-green.svg) ](https://github.com/DapperDox/dapperdox/releases/tag/v1.1.1)
+# DapperDox&nbsp;&nbsp;&nbsp;[![Build Status](https://travis-ci.org/DapperDox/dapperdox.svg?branch=master)](https://travis-ci.org/DapperDox/dapperdox) [![Download](https://img.shields.io/badge/release-v1.1.1-green.svg) ](https://github.com/UKHomeOffice/dapperdox/releases/tag/v1.1.1)
 
 ### Beautiful, integrated, OpenAPI documentation.
 
@@ -6,6 +6,11 @@
 
 ![DapperDox logo](/docs/logo-dapperdox-github.png "DapperDox")
 
+## Home office version 
+As hard as I tried, using ``dep tool``, and using different git remotes I could not avoid renaming the imports.
+The final straw was creating the Docker container, it has to do a ``go get``, which pulls the original dapperdox. 
+It feel hacky but it works...maybe revisit when ``vgo`` matures
+  
 ## Features
 
 * Author full documentation in GitHub Flavoured Markdown.
@@ -22,9 +27,8 @@ Detailed usage instructions are available on the [DapperDox website http://dappe
 ## Quickstart
 
 We provide the lastest release builds for the most common operating systems and architectures, which you
-can download from [releases](https://github.com/DapperDox/dapperdox/releases),
+can download from [releases](https://github.com/UKHomeOffice/dapperdox/releases),
 or you can build from source by cloning this repo..
-See [downloads](http://dapperdox.io/download/downloads) for further information.
 
 ### Build from source
 
