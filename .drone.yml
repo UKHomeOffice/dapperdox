@@ -1,0 +1,16 @@
+pipeline:
+
+  image_to_quay:
+    image: quay.io/ukhomeofficedigital/drone-docker
+    secrets:
+      - docker_password
+    environment:
+      - DOCKER_USERNAME=ukhomeofficedigital+dapperdox
+    registry: quay.io
+    repo: quay.io/ukhomeofficedigital/dapperdox
+    tags:
+      - ${DRONE_COMMIT_SHA}
+      - latest
+    when:
+      branch: master
+      event: push
