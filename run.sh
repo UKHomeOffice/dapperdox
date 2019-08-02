@@ -11,7 +11,7 @@ for d in `ls /specs`
 do
   echo ${d}
   mkdir specs/${d}
-  cp /specs/${d}/content/swagger.json specs/${d}
+  cp /specs/${d}/content/swagger.* specs/${d}
   cp -r /specs/${d}/content/md/* assets/sections
 done
 
