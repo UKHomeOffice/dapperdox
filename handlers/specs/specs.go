@@ -92,7 +92,7 @@ func Register(r *pat.Router) {
 		ext := filepath.Ext(path)
 
 		switch ext {
-		case ".json", ".yaml":
+		case ".json", ".yaml", ".yml":
 			// Strip base path and file extension
 			route := strings.TrimPrefix(path, base)
 

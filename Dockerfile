@@ -3,7 +3,7 @@ FROM golang:1.12.7 AS builder
 # install unzip utility
 RUN apt-get -y update && apt-get -y install zip
 
-WORKDIR /go/src/dapperdox
+WORKDIR /go/src/github.com/UKHomeOffice/dapperdox
 
 COPY . ./
 
