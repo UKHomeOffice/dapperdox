@@ -73,8 +73,11 @@ func (c *APISpecification) GetByID(id string) *APIGroup {
 type APISet []APIGroup
 
 type Info struct {
-	Title       string
-	Description string
+	Title        string
+	Description  string
+	ContactName  string
+	ContactURL   string
+	ContactEmail string
 }
 
 type ExternalDocs struct {
@@ -335,6 +338,12 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 
 	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(apispec.Info.Description)))
 	c.APIInfo.Title = apispec.Info.Title
+
+	if apispec.Info.Contact != nil {
+		c.APIInfo.ContactName = apispec.Info.Contact.Name
+		c.APIInfo.ContactURL = apispec.Info.Contact.URL
+		c.APIInfo.ContactEmail = apispec.Info.Contact.Email
+	}
 
 	if len(c.APIInfo.Title) == 0 {
 		logger.Errorf(nil, "Error: Specification %s does not have a info.title member.\n", c.URL)

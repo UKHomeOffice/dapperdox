@@ -1,0 +1,17 @@
+[: if or (.Info.ContactName) (.Info.ContactURL) (.Info.ContactEmail):]
+<div>
+    <h2 class="sub-header">Contact Details</h2>
+    [: if .Info.ContactName :]
+    <p> Name : [: .Info.ContactName :]
+    <p/>
+    [: end :]
+    [: if .Info.ContactURL :]
+    <p> URL : [: .Info.ContactURL :]
+    <p/>
+    [: end :]
+    [: if .Info.ContactEmail :]
+    <p> Email : [: .Info.ContactEmail :]
+    <p/>
+    [: end :]
+</div>
+[: end :]
