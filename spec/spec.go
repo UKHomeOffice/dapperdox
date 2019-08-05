@@ -77,6 +77,11 @@ type Info struct {
 	Description string
 }
 
+type ExternalDocs struct {
+	Description string
+	URL         string
+}
+
 // APIGroup parents all grouped API methods (Grouping controlled by tagging, if used, or by method path otherwise)
 type APIGroup struct {
 	ID                     string
@@ -89,6 +94,7 @@ type APIGroup struct {
 	Methods                []Method            // The current version
 	CurrentVersion         string              // The latest version in operation for the API
 	Info                   *Info
+	ExternalDocs           *ExternalDocs
 	Consumes               []string
 	Produces               []string
 }
@@ -379,6 +385,14 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 
 		var name = tag.Name
 		var description = tag.Description
+		var externalDocs *ExternalDocs
+
+		if tag.ExternalDocs != nil {
+			externalDocs = &ExternalDocs{
+				Description: tag.ExternalDocs.Description,
+				URL:         tag.ExternalDocs.URL,
+			}
+		}
 
 		logger.Tracef(nil, "    - %s\n", name)
 
@@ -388,6 +402,7 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 				ID:                     TitleToKebab(name),
 				Name:                   name,
 				Description:            description,
+				ExternalDocs:           externalDocs,
 				URL:                    u,
 				Info:                   &c.APIInfo,
 				MethodNavigationByName: methodNavByName,

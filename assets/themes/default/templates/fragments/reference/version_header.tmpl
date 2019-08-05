@@ -2,7 +2,11 @@
 <div class="page-header">
     <h1 class="pull-left nomargin">[: .Title :]</h1>
     <div class="clearfix"></div>
-    <p>[: .TitleSuffix :]</p>
+    <p>[: .TitleSuffix :]
+    [: if .ExternalDocs :]
+        (<a href="[: .ExternalDocs.URL :]">[: .ExternalDocs.Description :]</a>)
+    [: end :]
+    </p>
     [: if .Versions :]
     <div class="pull-right">
         <div class="btn-group">
