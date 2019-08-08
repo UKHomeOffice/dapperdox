@@ -369,9 +369,6 @@ func (c *APISpecification) LoadSwagger2(swagger2Doc *loads.Document) error {
 
 	c.ID = TitleToKebab(c.APIInfo.Title)
 
-	c.getSecurityDefinitions(swagger2Spec)
-	c.getDefaultSecurity(swagger2Spec)
-
 	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
 	if byname, ok := swagger2Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
 		methodNavByName = byname
@@ -464,7 +461,7 @@ func (c *APISpecification) LoadSwagger2(swagger2Doc *loads.Document) error {
 			}
 			api.CurrentVersion = ver
 
-			c.getMethods(tag, api, &api.Methods, &pathItem, path, ver) // Current version
+			c.getMethods2(tag, api, &api.Methods, &pathItem, path, ver) // Current version
 			//c.getVersions(tag, api, pathItem.Versions, path)           // All versions
 
 			// If API was populated (will not be if tags do not match), add to set
@@ -504,34 +501,22 @@ func (c *APISpecification) LoadSwagger2(swagger2Doc *loads.Document) error {
 // LoadOpenAPI3 loads API specs from the supplied Swagger2 document AND openAPI3 spec.
 // The use of both documents is a bit of technical debt. The openapi3.Swagger struct doesn't contain the Tags element.
 // Its on the todo list!
-func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *openapi3.Swagger) error {
+func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, openAPI3Spec *openapi3.Swagger) error {
 
 	swagger2Spec := swagger2Doc.Spec()
 
-	basePath := swagger2Spec.BasePath
-	basePathLen := len(basePath)
-	// Ignore basepath if it is a single '/'
-	if basePathLen == 1 && basePath[0] == '/' {
-		basePathLen = 0
-	}
-
-	scheme := "http"
-	if swagger2Spec.Schemes != nil {
-		scheme = swagger2Spec.Schemes[0]
-	}
-
-	u, err := url.Parse(scheme + "://" + swagger2Spec.Host)
+	u, err := url.Parse("http://localhost")
 	if err != nil {
 		return err
 	}
 
-	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(swagger2Spec.Info.Description)))
-	c.APIInfo.Title = swagger2Spec.Info.Title
+	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(openAPI3Spec.Info.Description)))
+	c.APIInfo.Title = openAPI3Spec.Info.Title
 
-	if swagger2Spec.Info.Contact != nil {
-		c.APIInfo.ContactName = swagger2Spec.Info.Contact.Name
-		c.APIInfo.ContactURL = swagger2Spec.Info.Contact.URL
-		c.APIInfo.ContactEmail = swagger2Spec.Info.Contact.Email
+	if openAPI3Spec.Info.Contact != nil {
+		c.APIInfo.ContactName = openAPI3Spec.Info.Contact.Name
+		c.APIInfo.ContactURL = openAPI3Spec.Info.Contact.URL
+		c.APIInfo.ContactEmail = openAPI3Spec.Info.Contact.Email
 	}
 
 	if len(c.APIInfo.Title) == 0 {
@@ -543,16 +528,13 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *op
 
 	c.ID = TitleToKebab(c.APIInfo.Title)
 
-	c.getSecurityDefinitions(swagger2Spec)
-	c.getDefaultSecurity(swagger2Spec)
-
 	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
-	if byname, ok := swagger2Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
+	if byname, ok := openAPI3Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
 		methodNavByName = byname
 	}
 
 	var methodSortBy []string
-	if sortByList, ok := swagger2Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
+	if sortByList, ok := openAPI3Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
 		for _, sortBy := range sortByList {
 			keyname := sortBy.(string)
 			if _, ok := sortTypes[keyname]; !ok {
@@ -563,18 +545,15 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *op
 		}
 	}
 
-	//logger.Printf(nil, "DUMP OF ENTIRE SWAGGER SPEC\n")
-	//spew.Dump(swagger2Doc)
-
 	// Use the top level TAGS to order the API resources/endpoints
 	// If Tags: [] is not defined, or empty, then no filtering or ordering takes place,
 	// and all API paths will be documented..
+	// TODO - use openapi3 to get tags
 	for _, tag := range getTags(swagger2Spec) {
 		logger.Tracef(nil, "  In tag loop...\n")
-		// Tag matching may not be as expected if multiple paths have the same TAG (which is technically permitted)
-		var ok bool
 
-		var api *APIGroup
+		api := &APIGroup{}
+
 		groupingByTag := false
 
 		if tag.Name != "" {
@@ -605,17 +584,12 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *op
 				Info:                   &c.APIInfo,
 				MethodNavigationByName: methodNavByName,
 				MethodSortBy:           methodSortBy,
-				Consumes:               swagger2Spec.Consumes,
-				Produces:               swagger2Spec.Produces,
 			}
 		}
 
-		for path, pathItem := range swagger2Doc.Analyzer.AllPaths() {
-			logger.Tracef(nil, "    In path loop...\n")
-
-			if basePathLen > 0 {
-				path = basePath + path
-			}
+		for path, pathItem := range openAPI3Spec.Paths {
+			logger.Infof(nil, path)
+			//logger.Infof(nil, pathItem.Get.Description)
 
 			// If not grouping by tag, then build the API at the path level
 			if !groupingByTag {
@@ -627,19 +601,12 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *op
 					Info:                   &c.APIInfo,
 					MethodNavigationByName: methodNavByName,
 					MethodSortBy:           methodSortBy,
-					Consumes:               swagger2Spec.Consumes,
-					Produces:               swagger2Spec.Produces,
 				}
 			}
 
-			var ver string
-			if ver, ok = pathItem.Extensions["x-version"].(string); !ok {
-				ver = "latest"
-			}
-			api.CurrentVersion = ver
+			api.CurrentVersion = "latest"
 
-			c.getMethods(tag, api, &api.Methods, &pathItem, path, ver) // Current version
-			//c.getVersions(tag, api, pathItem.Versions, path)           // All versions
+			c.getMethods3(tag, api, &api.Methods, pathItem, path, api.CurrentVersion) // Current version
 
 			// If API was populated (will not be if tags do not match), add to set
 			if !groupingByTag && len(api.Methods) > 0 {
@@ -655,20 +622,6 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *op
 
 			sort.Sort(SortMethods(api.Methods))
 			c.APIs = append(c.APIs, *api) // All APIs (versioned within)
-		}
-	}
-
-	// Build a API map, grouping by version
-	for _, api := range c.APIs {
-		for v, _ := range api.Versions {
-			if c.APIVersions == nil {
-				c.APIVersions = make(map[string]APISet)
-			}
-			// Create copy of API and set Methods array to be correct for the version we are building
-			napi := api
-			napi.Methods = napi.Versions[v]
-			napi.Versions = nil
-			c.APIVersions[v] = append(c.APIVersions[v], napi) // Group APIs by version
 		}
 	}
 
@@ -691,36 +644,31 @@ func getTags(specification *spec.Swagger) []spec.Tag {
 
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) getVersions(tag spec.Tag, api *APIGroup, versions map[string]spec.PathItem, path string) {
-	if versions == nil {
-		return
-	}
-	api.Versions = make(map[string][]Method)
+func (c *APISpecification) getMethods2(tag spec.Tag, api *APIGroup, methods *[]Method, pi *spec.PathItem, path string, version string) {
 
-	for v, pi := range versions {
-		logger.Tracef(nil, "Process version %s\n", v)
-		var method []Method
-		c.getMethods(tag, api, &method, &pi, path, v)
-		api.Versions[v] = method
-	}
+	c.getMethod2(tag, api, methods, version, pi, pi.Get, path, "get")
+	c.getMethod2(tag, api, methods, version, pi, pi.Post, path, "post")
+	c.getMethod2(tag, api, methods, version, pi, pi.Put, path, "put")
+	c.getMethod2(tag, api, methods, version, pi, pi.Delete, path, "delete")
+	c.getMethod2(tag, api, methods, version, pi, pi.Head, path, "head")
+	c.getMethod2(tag, api, methods, version, pi, pi.Options, path, "options")
+	c.getMethod2(tag, api, methods, version, pi, pi.Patch, path, "patch")
+}
+
+func (c *APISpecification) getMethods3(tag spec.Tag, api *APIGroup, methods *[]Method, pi *openapi3.PathItem, path string, version string) {
+
+	c.getMethod3(tag, api, methods, version, pi, pi.Get, path, "get")
+	c.getMethod3(tag, api, methods, version, pi, pi.Post, path, "post")
+	c.getMethod3(tag, api, methods, version, pi, pi.Put, path, "put")
+	c.getMethod3(tag, api, methods, version, pi, pi.Delete, path, "delete")
+	c.getMethod3(tag, api, methods, version, pi, pi.Head, path, "head")
+	c.getMethod3(tag, api, methods, version, pi, pi.Options, path, "options")
+	c.getMethod3(tag, api, methods, version, pi, pi.Patch, path, "patch")
 }
 
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) getMethods(tag spec.Tag, api *APIGroup, methods *[]Method, pi *spec.PathItem, path string, version string) {
-
-	c.getMethod(tag, api, methods, version, pi, pi.Get, path, "get")
-	c.getMethod(tag, api, methods, version, pi, pi.Post, path, "post")
-	c.getMethod(tag, api, methods, version, pi, pi.Put, path, "put")
-	c.getMethod(tag, api, methods, version, pi, pi.Delete, path, "delete")
-	c.getMethod(tag, api, methods, version, pi, pi.Head, path, "head")
-	c.getMethod(tag, api, methods, version, pi, pi.Options, path, "options")
-	c.getMethod(tag, api, methods, version, pi, pi.Patch, path, "patch")
-}
-
-// -----------------------------------------------------------------------------
-
-func (c *APISpecification) getMethod(tag spec.Tag, api *APIGroup, methods *[]Method, version string, pathitem *spec.PathItem, operation *spec.Operation, path, methodname string) {
+func (c *APISpecification) getMethod2(tag spec.Tag, api *APIGroup, methods *[]Method, version string, pathitem *spec.PathItem, operation *spec.Operation, path, methodname string) {
 	if operation == nil {
 		logger.Tracef(nil, "Skipping %s %s - Operation is nil.", path, methodname)
 		return
@@ -734,14 +682,42 @@ func (c *APISpecification) getMethod(tag spec.Tag, api *APIGroup, methods *[]Met
 			logger.Tracef(nil, "Skipping %s - Operation does not contain a tag member, and tagging is in use.", operation.Summary)
 			return
 		}
-		method := c.processMethod(api, pathitem, operation, path, methodname, version)
+		method := c.processMethod2(api, pathitem, operation, path, methodname, version)
 		*methods = append(*methods, *method)
 	} else {
 		logger.Tracef(nil, "    > Check tags")
 		for _, t := range operation.Tags {
 			logger.Tracef(nil, "      - Compare tag '%s' with '%s'\n", tag.Name, t)
 			if tag.Name == "" || t == tag.Name {
-				method := c.processMethod(api, pathitem, operation, path, methodname, version)
+				method := c.processMethod2(api, pathitem, operation, path, methodname, version)
+				*methods = append(*methods, *method)
+			}
+		}
+	}
+}
+
+func (c *APISpecification) getMethod3(tag spec.Tag, api *APIGroup, methods *[]Method, version string, pathitem *openapi3.PathItem, operation *openapi3.Operation, path, methodname string) {
+	if operation == nil {
+		logger.Tracef(nil, "Skipping %s %s - Operation is nil.", path, methodname)
+		return
+	}
+	// Filter and sort by matching current top-level tag with the operation tags.
+	// If Tagging is not used by spec, then process each operation without filtering.
+	taglen := len(operation.Tags)
+	logger.Tracef(nil, "  Operation tag length: %d", taglen)
+	if taglen == 0 {
+		if tag.Name != "" {
+			logger.Tracef(nil, "Skipping %s - Operation does not contain a tag member, and tagging is in use.", operation.Summary)
+			return
+		}
+		method := c.processMethod3(api, pathitem, operation, path, methodname, version)
+		*methods = append(*methods, *method)
+	} else {
+		logger.Tracef(nil, "    > Check tags")
+		for _, t := range operation.Tags {
+			logger.Tracef(nil, "      - Compare tag '%s' with '%s'\n", tag.Name, t)
+			if tag.Name == "" || t == tag.Name {
+				method := c.processMethod3(api, pathitem, operation, path, methodname, version)
 				*methods = append(*methods, *method)
 			}
 		}
@@ -837,7 +813,7 @@ func (p *Parameter) setEnums(src spec.Parameter) {
 
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) processMethod(api *APIGroup, pathItem *spec.PathItem, o *spec.Operation, path, methodname string, version string) *Method {
+func (c *APISpecification) processMethod2(api *APIGroup, pathItem *spec.PathItem, o *spec.Operation, path, methodname string, version string) *Method {
 
 	var opname string
 	var gotOpname bool
@@ -984,6 +960,144 @@ func (c *APISpecification) processMethod(api *APIGroup, pathItem *spec.PathItem,
 		method.Security = c.DefaultSecurity
 	}
 
+	return method
+}
+
+func (c *APISpecification) processMethod3(api *APIGroup, pathItem *openapi3.PathItem, o *openapi3.Operation, path, methodname string, version string) *Method {
+
+	var opname string
+	var gotOpname bool
+
+	operationName := methodname
+	if opname, gotOpname = o.Extensions["x-operationName"].(string); gotOpname {
+		operationName = opname
+	}
+
+	// Construct an ID for the Method. Choose from operation ID, x-operationName, summary and lastly method name.
+	id := o.OperationID // OperationID
+	if id == "" {
+		// No ID, use x-operationName, if we have it...
+		if gotOpname {
+			id = TitleToKebab(opname)
+		} else {
+			id = TitleToKebab(o.Summary) // No opname, use summary
+			if id == "" {
+				id = methodname // Last chance. Method name.
+			}
+		}
+	}
+
+	navigationName := operationName
+	if api.MethodNavigationByName {
+		navigationName = o.Summary
+	}
+
+	sortkey := api.getMethodSortKey(path, methodname, operationName, navigationName, o.Summary)
+
+	method := &Method{
+		ID:             CamelToKebab(id),
+		Name:           o.Summary,
+		Description:    string(github_flavored_markdown.Markdown([]byte(o.Description))),
+		Method:         methodname,
+		Path:           path,
+		Responses:      make(map[int]Response),
+		NavigationName: navigationName,
+		OperationName:  operationName,
+		APIGroup:       api,
+		SortKey:        sortkey,
+	}
+
+	// If Tagging is not used by spec to select, group and order API paths to document, then
+	// complete the missing names.
+	// First try the vendor extension x-pathName, falling back to summary if not set.
+	// XXX Note, that the APIGroup will get the last pathName set on the path methods added to the group (by tag).
+	//
+	if pathname, ok := pathItem.Extensions["x-pathName"].(string); ok {
+		api.Name = pathname
+		api.ID = TitleToKebab(api.Name)
+	}
+	if api.Name == "" {
+		name := o.Summary
+		description := o.Description
+		if name == "" {
+			logger.Errorf(nil, "Error: Operation '%s' does not have an operationId or summary member.", id)
+			os.Exit(1)
+		}
+		api.Name = name
+		api.Description = description
+		api.ID = TitleToKebab(name)
+	}
+
+	if c.ResourceList == nil {
+		c.ResourceList = make(map[string]map[string]*Resource)
+	}
+
+	for _, param := range o.Parameters {
+		p := Parameter{
+			Name:        param.Value.Name,
+			In:          param.Value.In,
+			Description: string(github_flavored_markdown.Markdown([]byte(param.Value.Description))),
+			Required:    param.Value.Required,
+		}
+		// TODO
+		//p.setType(param)
+		//p.setEnums(param)
+
+		switch strings.ToLower(param.Value.In) {
+		case "formdata":
+			method.FormParams = append(method.FormParams, p)
+		case "path":
+			method.PathParams = append(method.PathParams, p)
+		case "body":
+			if param.Value.Schema == nil {
+				logger.Errorf(nil, "Error: 'in body' parameter %s is missing a schema declaration.\n", param.Value.Name)
+				os.Exit(1)
+			}
+			var body map[string]interface{}
+			// TODO
+			//p.Resource, body, p.IsArray = c.resourceFromSchema(param.Schema, method, nil, true)
+			p.Resource.Schema = jsonResourceToString(body, p.IsArray)
+			p.Resource.origin = RequestBody
+			method.BodyParam = &p
+			c.crossLinkMethodAndResource(p.Resource, method, version)
+		case "header":
+			method.HeaderParams = append(method.HeaderParams, p)
+		case "query":
+			method.QueryParams = append(method.QueryParams, p)
+		}
+	}
+
+	// Compile resources from response declaration
+
+	if o.Responses == nil {
+		logger.Errorf(nil, "Error: Operation %s %s is missing a responses declaration.\n", methodname, path)
+		os.Exit(1)
+	}
+
+	/*	TODO
+	// FIXME - Dies if there are no responses...
+		for status, response := range o.Responses.StatusCodeResponses {
+			logger.Tracef(nil, "Response for status %d", status)
+			//spew.Dump(response)
+
+			// Discover if the resource is already declared, and pick it up
+			// if it is (keyed on version number)
+			if response.Schema != nil {
+				if _, ok := c.ResourceList[version]; !ok {
+					c.ResourceList[version] = make(map[string]*Resource)
+				}
+			}
+			rsp := c.buildResponse(&response, method, version)
+			(*rsp).StatusDescription = HTTPStatusDescription(status)
+			method.Responses[status] = *rsp
+
+		}
+
+		if o.Responses.Default != nil {
+			rsp := c.buildResponse(o.Responses.Default, method, version)
+			method.DefaultResponse = rsp
+		}
+	*/
 	return method
 }
 

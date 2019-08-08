@@ -43,4 +43,11 @@ func TestLoadsOpenAPI3(t *testing.T) {
 		t.Error(`Failed to load spec` + err.Error())
 	}
 
+	if specification.ID != "reference-data-service-api" {
+		t.Error(`ID fail`)
+	}
+	if specification.APIInfo.Title != "Reference Data Service API" {
+		t.Error(`APIInfo.Title fail`)
+	}
+
 }
