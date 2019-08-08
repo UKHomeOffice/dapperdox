@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/getkin/kin-openapi/openapi3"
 	"net/url"
 	"os"
 	"regexp"
@@ -288,13 +289,38 @@ func LoadSpecifications(specHost string, collapse bool) error {
 			specification = &APISpecification{}
 		}
 
-		err = specification.Load(specLocation, specHost)
+		specification.URL = specLocation
+
+		if isLocalSpecUrl(specLocation) && !strings.HasPrefix(specLocation, "/") {
+			specLocation = "/" + specLocation
+		}
+
+		location, err := url.Parse(normalizeSpecLocation(specLocation, specHost))
 		if err != nil {
 			return err
 		}
 
-		if collapse {
-			//specification.ID = "api"
+		document, err := loadSpec(normalizeSpecLocation(specLocation, specHost))
+		if err != nil {
+			return err
+		}
+
+		openAPI3Spec, _ := openapi3.NewSwaggerLoader().LoadSwaggerFromURI(location)
+
+		if openAPI3Spec.OpenAPI != "" {
+			logger.Infof(nil, "OpenAPI 3")
+
+			err = specification.LoadOpenAPI3(document, openAPI3Spec)
+			if err != nil {
+				return err
+			}
+		} else {
+			logger.Infof(nil, "Swagger 2")
+
+			err = specification.LoadSwagger2(document)
+			if err != nil {
+				return err
+			}
 		}
 
 		APISuite[specification.ID] = specification
@@ -303,23 +329,12 @@ func LoadSpecifications(specHost string, collapse bool) error {
 	return nil
 }
 
-// -----------------------------------------------------------------------------
-// Load loads API specs from the supplied host (usually local!)
-func (c *APISpecification) Load(specLocation string, specHost string) error {
+// LoadSwagger2 loads API specs from the supplied Swagger2 document
+func (c *APISpecification) LoadSwagger2(swagger2Doc *loads.Document) error {
 
-	if isLocalSpecUrl(specLocation) && !strings.HasPrefix(specLocation, "/") {
-		specLocation = "/" + specLocation
-	}
+	swagger2Spec := swagger2Doc.Spec()
 
-	c.URL = specLocation
-
-	document, err := loadSpec(normalizeSpecLocation(specLocation, specHost))
-	if err != nil {
-		return err
-	}
-	apispec := document.Spec()
-
-	basePath := apispec.BasePath
+	basePath := swagger2Spec.BasePath
 	basePathLen := len(basePath)
 	// Ignore basepath if it is a single '/'
 	if basePathLen == 1 && basePath[0] == '/' {
@@ -327,22 +342,22 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 	}
 
 	scheme := "http"
-	if apispec.Schemes != nil {
-		scheme = apispec.Schemes[0]
+	if swagger2Spec.Schemes != nil {
+		scheme = swagger2Spec.Schemes[0]
 	}
 
-	u, err := url.Parse(scheme + "://" + apispec.Host)
+	u, err := url.Parse(scheme + "://" + swagger2Spec.Host)
 	if err != nil {
 		return err
 	}
 
-	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(apispec.Info.Description)))
-	c.APIInfo.Title = apispec.Info.Title
+	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(swagger2Spec.Info.Description)))
+	c.APIInfo.Title = swagger2Spec.Info.Title
 
-	if apispec.Info.Contact != nil {
-		c.APIInfo.ContactName = apispec.Info.Contact.Name
-		c.APIInfo.ContactURL = apispec.Info.Contact.URL
-		c.APIInfo.ContactEmail = apispec.Info.Contact.Email
+	if swagger2Spec.Info.Contact != nil {
+		c.APIInfo.ContactName = swagger2Spec.Info.Contact.Name
+		c.APIInfo.ContactURL = swagger2Spec.Info.Contact.URL
+		c.APIInfo.ContactEmail = swagger2Spec.Info.Contact.Email
 	}
 
 	if len(c.APIInfo.Title) == 0 {
@@ -354,16 +369,16 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 
 	c.ID = TitleToKebab(c.APIInfo.Title)
 
-	c.getSecurityDefinitions(apispec)
-	c.getDefaultSecurity(apispec)
+	c.getSecurityDefinitions(swagger2Spec)
+	c.getDefaultSecurity(swagger2Spec)
 
 	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
-	if byname, ok := apispec.Extensions["x-navigateMethodsByName"].(bool); ok {
+	if byname, ok := swagger2Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
 		methodNavByName = byname
 	}
 
 	var methodSortBy []string
-	if sortByList, ok := apispec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
+	if sortByList, ok := swagger2Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
 		for _, sortBy := range sortByList {
 			keyname := sortBy.(string)
 			if _, ok := sortTypes[keyname]; !ok {
@@ -375,12 +390,12 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 	}
 
 	//logger.Printf(nil, "DUMP OF ENTIRE SWAGGER SPEC\n")
-	//spew.Dump(document)
+	//spew.Dump(swagger2Doc)
 
 	// Use the top level TAGS to order the API resources/endpoints
 	// If Tags: [] is not defined, or empty, then no filtering or ordering takes place,
 	// and all API paths will be documented..
-	for _, tag := range getTags(apispec) {
+	for _, tag := range getTags(swagger2Spec) {
 		logger.Tracef(nil, "  In tag loop...\n")
 		// Tag matching may not be as expected if multiple paths have the same TAG (which is technically permitted)
 		var ok bool
@@ -416,12 +431,12 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 				Info:                   &c.APIInfo,
 				MethodNavigationByName: methodNavByName,
 				MethodSortBy:           methodSortBy,
-				Consumes:               apispec.Consumes,
-				Produces:               apispec.Produces,
+				Consumes:               swagger2Spec.Consumes,
+				Produces:               swagger2Spec.Produces,
 			}
 		}
 
-		for path, pathItem := range document.Analyzer.AllPaths() {
+		for path, pathItem := range swagger2Doc.Analyzer.AllPaths() {
 			logger.Tracef(nil, "    In path loop...\n")
 
 			if basePathLen > 0 {
@@ -438,8 +453,182 @@ func (c *APISpecification) Load(specLocation string, specHost string) error {
 					Info:                   &c.APIInfo,
 					MethodNavigationByName: methodNavByName,
 					MethodSortBy:           methodSortBy,
-					Consumes:               apispec.Consumes,
-					Produces:               apispec.Produces,
+					Consumes:               swagger2Spec.Consumes,
+					Produces:               swagger2Spec.Produces,
+				}
+			}
+
+			var ver string
+			if ver, ok = pathItem.Extensions["x-version"].(string); !ok {
+				ver = "latest"
+			}
+			api.CurrentVersion = ver
+
+			c.getMethods(tag, api, &api.Methods, &pathItem, path, ver) // Current version
+			//c.getVersions(tag, api, pathItem.Versions, path)           // All versions
+
+			// If API was populated (will not be if tags do not match), add to set
+			if !groupingByTag && len(api.Methods) > 0 {
+				logger.Tracef(nil, "    + Adding %s\n", name)
+
+				sort.Sort(SortMethods(api.Methods))
+				c.APIs = append(c.APIs, *api) // All APIs (versioned within)
+			}
+		}
+
+		if groupingByTag && len(api.Methods) > 0 {
+			logger.Tracef(nil, "    + Adding %s\n", name)
+
+			sort.Sort(SortMethods(api.Methods))
+			c.APIs = append(c.APIs, *api) // All APIs (versioned within)
+		}
+	}
+
+	// Build a API map, grouping by version
+	for _, api := range c.APIs {
+		for v, _ := range api.Versions {
+			if c.APIVersions == nil {
+				c.APIVersions = make(map[string]APISet)
+			}
+			// Create copy of API and set Methods array to be correct for the version we are building
+			napi := api
+			napi.Methods = napi.Versions[v]
+			napi.Versions = nil
+			c.APIVersions[v] = append(c.APIVersions[v], napi) // Group APIs by version
+		}
+	}
+
+	return nil
+}
+
+// LoadOpenAPI3 loads API specs from the supplied Swagger2 document AND openAPI3 spec.
+// The use of both documents is a bit of technical debt. The openapi3.Swagger struct doesn't contain the Tags element.
+// Its on the todo list!
+func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, swagger *openapi3.Swagger) error {
+
+	swagger2Spec := swagger2Doc.Spec()
+
+	basePath := swagger2Spec.BasePath
+	basePathLen := len(basePath)
+	// Ignore basepath if it is a single '/'
+	if basePathLen == 1 && basePath[0] == '/' {
+		basePathLen = 0
+	}
+
+	scheme := "http"
+	if swagger2Spec.Schemes != nil {
+		scheme = swagger2Spec.Schemes[0]
+	}
+
+	u, err := url.Parse(scheme + "://" + swagger2Spec.Host)
+	if err != nil {
+		return err
+	}
+
+	c.APIInfo.Description = string(github_flavored_markdown.Markdown([]byte(swagger2Spec.Info.Description)))
+	c.APIInfo.Title = swagger2Spec.Info.Title
+
+	if swagger2Spec.Info.Contact != nil {
+		c.APIInfo.ContactName = swagger2Spec.Info.Contact.Name
+		c.APIInfo.ContactURL = swagger2Spec.Info.Contact.URL
+		c.APIInfo.ContactEmail = swagger2Spec.Info.Contact.Email
+	}
+
+	if len(c.APIInfo.Title) == 0 {
+		logger.Errorf(nil, "Error: Specification %s does not have a info.title member.\n", c.URL)
+		os.Exit(1)
+	}
+
+	logger.Tracef(nil, "Parse OpenAPI specification '%s'\n", c.APIInfo.Title)
+
+	c.ID = TitleToKebab(c.APIInfo.Title)
+
+	c.getSecurityDefinitions(swagger2Spec)
+	c.getDefaultSecurity(swagger2Spec)
+
+	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
+	if byname, ok := swagger2Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
+		methodNavByName = byname
+	}
+
+	var methodSortBy []string
+	if sortByList, ok := swagger2Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
+		for _, sortBy := range sortByList {
+			keyname := sortBy.(string)
+			if _, ok := sortTypes[keyname]; !ok {
+				logger.Errorf(nil, "Error: Invalid x-sortBy value %s\n", keyname)
+			} else {
+				methodSortBy = append(methodSortBy, keyname)
+			}
+		}
+	}
+
+	//logger.Printf(nil, "DUMP OF ENTIRE SWAGGER SPEC\n")
+	//spew.Dump(swagger2Doc)
+
+	// Use the top level TAGS to order the API resources/endpoints
+	// If Tags: [] is not defined, or empty, then no filtering or ordering takes place,
+	// and all API paths will be documented..
+	for _, tag := range getTags(swagger2Spec) {
+		logger.Tracef(nil, "  In tag loop...\n")
+		// Tag matching may not be as expected if multiple paths have the same TAG (which is technically permitted)
+		var ok bool
+
+		var api *APIGroup
+		groupingByTag := false
+
+		if tag.Name != "" {
+			groupingByTag = true
+		}
+
+		var name = tag.Name
+		var description = tag.Description
+		var externalDocs *ExternalDocs
+
+		if tag.ExternalDocs != nil {
+			externalDocs = &ExternalDocs{
+				Description: tag.ExternalDocs.Description,
+				URL:         tag.ExternalDocs.URL,
+			}
+		}
+
+		logger.Tracef(nil, "    - %s\n", name)
+
+		// If we're grouping by TAGs, then build the API at the tag level
+		if groupingByTag {
+			api = &APIGroup{
+				ID:                     TitleToKebab(name),
+				Name:                   name,
+				Description:            description,
+				ExternalDocs:           externalDocs,
+				URL:                    u,
+				Info:                   &c.APIInfo,
+				MethodNavigationByName: methodNavByName,
+				MethodSortBy:           methodSortBy,
+				Consumes:               swagger2Spec.Consumes,
+				Produces:               swagger2Spec.Produces,
+			}
+		}
+
+		for path, pathItem := range swagger2Doc.Analyzer.AllPaths() {
+			logger.Tracef(nil, "    In path loop...\n")
+
+			if basePathLen > 0 {
+				path = basePath + path
+			}
+
+			// If not grouping by tag, then build the API at the path level
+			if !groupingByTag {
+				api = &APIGroup{
+					ID:                     TitleToKebab(name),
+					Name:                   name,
+					Description:            description,
+					URL:                    u,
+					Info:                   &c.APIInfo,
+					MethodNavigationByName: methodNavByName,
+					MethodSortBy:           methodSortBy,
+					Consumes:               swagger2Spec.Consumes,
+					Produces:               swagger2Spec.Produces,
 				}
 			}
 
