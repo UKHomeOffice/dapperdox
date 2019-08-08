@@ -94,7 +94,6 @@ func New() *render.Render {
 		Asset:      asset.Asset,
 		AssetNames: asset.AssetNames,
 		Directory:  "assets/templates",
-		Delims:     render.Delims{Left: "[:", Right: ":]"},
 		Layout:     "layout",
 		Funcs: []template.FuncMap{template.FuncMap{
 			"map":           htmlform.Map,

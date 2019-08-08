@@ -30,11 +30,11 @@ $(document).ready(function(){
 
 <div class="side-nav affix"> 
     <ul class="nav nav-sidebar hide" id="navigation">
-        [: if .Guide :]
-            [: template "fragments/sidenav_guides" . :]
-        [: else :] 
-            [: template "fragments/sidenav_reference" . :]
-            [: template "fragments/sidenav_specification" . :]
-        [: end :]
+        {{ if .Guide }}
+            {{ template "fragments/sidenav_guides" . }}
+        {{ else }}
+            {{ template "fragments/sidenav_reference" . }}
+            {{ template "fragments/sidenav_specification" . }}
+        {{ end }}
     </ul>
 </div>

@@ -1,8 +1,8 @@
-[: template "fragments/reference/version_header" . :]
+{{ template "fragments/reference/version_header" . }}
 
-[: overlay "banner" . :]
-[: overlay "description" . :]
+{{ overlay "banner" . }}
+{{ overlay "description" . }}
 
-[: template "fragments/reference/api-body" (ext . "SpecPath" $.SpecPath) :]
+{{ template "fragments/reference/api-body" (ext . "SpecPath" $.SpecPath) }}
 
-[: overlay "additional" . :]
+{{ overlay "additional" . }}

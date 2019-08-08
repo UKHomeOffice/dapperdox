@@ -8,19 +8,19 @@
       </tr>
     </thead>
     <tbody>
-    [: range .Methods :]
+    {{ range .Methods }}
     <tr>
       <td>
-        <a id="[: .ID :]" href="[:$.SpecPath:]/reference/[: $.API.ID :]/[: .ID :][: if $.Version :]?v=[: $.Version :][: end :]">[: .OperationName :]</a>
+        <a id="{{ .ID }}" href="{{$.SpecPath}}/reference/{{ $.API.ID }}/{{ .ID }}{{ if $.Version }}?v={{ $.Version }}{{ end }}">{{ .OperationName }}</a>
       </td>
       <td>
-        <pre>[: uc .Method :]&nbsp;[: .Path :]</pre></td>
+        <pre>{{ uc .Method }}&nbsp;{{ .Path }}</pre></td>
       </td>
       <td class="hyphenate Hyphenator600hide">
-        [: .Name :]
+        {{ .Name }}
       </td>
     </tr>
-    [: end :]
+    {{ end }}
     </tbody>
   </table>
 </div>

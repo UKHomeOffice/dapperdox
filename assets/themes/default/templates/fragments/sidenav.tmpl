@@ -30,16 +30,16 @@ $(document).ready(function(){
 
 <div class="side-nav affix"> <!-- sidebar -->
     <ul class="nav nav-sidebar hide" id="navigation">
-        [: if .NavigationGuides :]
-          [: if .APIs :] 
+        {{ if .NavigationGuides }}
+          {{ if .APIs }}
             <!-- <li class="heading heading-top">Guides</li> -->
-          [: end :] 
-          [: template "fragments/sidenav_guides" . :]
-          [: if .APIs :] 
+          {{ end }}
+          {{ template "fragments/sidenav_guides" . }}
+          {{ if .APIs }}
             <!-- <li class="heading">Reference</li> -->
-          [: end :] 
-        [: end :] 
-        [: template "fragments/sidenav_reference" . :]
-        [: template "fragments/sidenav_specification" . :]
+          {{ end }}
+        {{ end }}
+        {{ template "fragments/sidenav_reference" . }}
+        {{ template "fragments/sidenav_specification" . }}
     </ul>
 </div>

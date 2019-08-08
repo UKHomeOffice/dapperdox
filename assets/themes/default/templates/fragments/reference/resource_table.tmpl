@@ -1,4 +1,4 @@
-[: overlay "properties" . :]
+{{ overlay "properties" . }}
 <div class="table-responsive">
   <table class="table table-striped">
     <thead>
@@ -10,7 +10,7 @@
       </tr>
     </thead>
     <tbody>
-      [: template "fragments/reference/properties" .Resource :]
+      {{ template "fragments/reference/properties" .Resource }}
     </tbody>
   </table>
 </div>

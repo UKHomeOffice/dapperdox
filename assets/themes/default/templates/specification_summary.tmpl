@@ -1,14 +1,14 @@
-[: overlay "banner" . :]
+{{ overlay "banner" . }}
 
 <div class="page-header">
-<h1 class="nomargin">[: .Info.Title :] reference</h1>
+<h1 class="nomargin">{{ .Info.Title }} reference</h1>
 </div>
 
-[: template "fragments/contact" . :]
+{{ template "fragments/contact" . }}
 
-[: overlay "description" . :]
+{{ overlay "description" . }}
 
 <!-- List all API endpoints -->
-[: template "fragments/reference/list_endpoints" . :]
+{{ template "fragments/reference/list_endpoints" . }}
 
-[: overlay "additional" . :]
+{{ overlay "additional" . }}

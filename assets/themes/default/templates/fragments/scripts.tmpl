@@ -9,23 +9,23 @@
             var basicAuth   = apiExplorer.getBasicAuthentication(); // Create basic auth string
 
             // Favour access tokens over api keys
-          [: range $name, $security := .Method.Security :]
-          [: if $security.Scheme.IsApiKey :]
+          {{ range $name, $security := .Method.Security }}
+          {{ if $security.Scheme.IsApiKey }}
             if     ( accessToken != "" ) { request.headers = {Authorization: "Bearer "+accessToken}; }
             else if( basicAuth   != "" ) { request.headers = {Authorization: "Basic "+basicAuth}; }
             else if( apiKey != "" ) {
-                var nam = "[: $security.Scheme.ParamName :]";
-              [: if eq $security.Scheme.ParamLocation "header" :]
+                var nam = "{{ $security.Scheme.ParamName }}";
+              {{ if eq $security.Scheme.ParamLocation "header" }}
                 request.headers = {};
                 request.headers[nam] = apiKey;
-              [: end :]
-              [: if eq $security.Scheme.ParamLocation "query" :]
+              {{ end }}
+              {{ if eq $security.Scheme.ParamLocation "query" }}
                 request.params = {};
                 request.params[nam] = apiKey;
-              [: end :]
+              {{ end }}
             }
-          [: end :]
-          [: end :]
+          {{ end }}
+          {{ end }}
         });
     });
 </script>
