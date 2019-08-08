@@ -5,6 +5,7 @@ pipeline:
     commands:
       - go get -v github.com/UKHomeOffice/dapperdox
       - cd $GOPATH/src/github.com/UKHomeOffice/dapperdox
+      - git checkout oa3
       - go test ./spec
     when:
       event: [push, pull_request, tag]
