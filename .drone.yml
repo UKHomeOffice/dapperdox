@@ -4,6 +4,7 @@ pipeline:
     image: golang:1.12.7
     commands:
       - go get -v github.com/UKHomeOffice/dapperdox
+      - go get
       - go test ./spec
     when:
       event: [push, pull_request, tag]
