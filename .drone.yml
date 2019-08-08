@@ -5,7 +5,8 @@ pipeline:
     commands:
       - go get -v github.com/UKHomeOffice/dapperdox
       - cd $GOPATH/src/github.com/UKHomeOffice/dapperdox
-      - git checkout oa3
+      - git checkout ${DRONE_COMMIT_BRANCH}
+      - go get
       - go test ./spec
     when:
       event: [push, pull_request, tag]
