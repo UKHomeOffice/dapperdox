@@ -26,6 +26,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/UKHomeOffice/dapperdox/config"
@@ -771,7 +772,7 @@ func (c *APISpecification) getDefaultSecurity(spec *spec.Swagger) {
 }
 
 // -----------------------------------------------------------------------------
-func (p *Parameter) setType(src spec.Parameter) {
+func (p *Parameter) setType2(src spec.Parameter) {
 	if src.Type == "array" {
 		if len(src.CollectionFormat) == 0 {
 			logger.Errorf(nil, "Error: Request parameter %s is an array without declaring the collectionFormat.\n", src.Name)
@@ -797,12 +798,52 @@ func (p *Parameter) setType(src spec.Parameter) {
 	p.Type = append(p.Type, ptype)
 }
 
-func (p *Parameter) setEnums(src spec.Parameter) {
+func (p *Parameter) setType3(src *openapi3.Parameter) {
+	if src.Schema.Value.Type == "array" {
+		if len(src.Schema.Value.Items.Value.Type) == 0 {
+			logger.Errorf(nil, "Error: Request parameter %s is an array without declaring the collectionFormat.\n", src.Name)
+			os.Exit(1)
+		}
+		p.Type = append(p.Type, src.Schema.Value.Items.Value.Type)
+		p.CollectionFormat = src.Schema.Value.Format
+		p.CollectionFormatDescription = collectionFormatDescription(src.Schema.Value.Items.Value.Type)
+	}
+	var ptype string
+	var format string
+
+	if src.Schema.Value.Type == "array" {
+		ptype = src.Schema.Value.Items.Value.Type
+		format = src.Schema.Value.Items.Value.Format
+	} else {
+		ptype = src.Schema.Value.Type
+		format = src.Schema.Value.Format
+	}
+	if len(format) > 0 {
+		ptype = format
+	}
+	p.Type = append(p.Type, ptype)
+}
+
+func (p *Parameter) setEnums2(src spec.Parameter) {
 	var ea []interface{}
 	if src.Type == "array" {
 		ea = src.Items.Enum
 	} else {
 		ea = src.Enum
+	}
+	var es = make([]string, 0)
+	for _, e := range ea {
+		es = append(es, fmt.Sprintf("%s", e))
+	}
+	p.Enum = es
+}
+
+func (p *Parameter) setEnums3(src *openapi3.Parameter) {
+	var ea []interface{}
+	if src.Schema.Value.Type == "array" {
+		ea = src.Schema.Value.Items.Value.Enum
+	} else {
+		ea = src.Schema.Value.Enum
 	}
 	var es = make([]string, 0)
 	for _, e := range ea {
@@ -899,8 +940,8 @@ func (c *APISpecification) processMethod2(api *APIGroup, pathItem *spec.PathItem
 			Description: string(github_flavored_markdown.Markdown([]byte(param.Description))),
 			Required:    param.Required,
 		}
-		p.setType(param)
-		p.setEnums(param)
+		p.setType2(param)
+		p.setEnums2(param)
 
 		switch strings.ToLower(param.In) {
 		case "formdata":
@@ -913,7 +954,7 @@ func (c *APISpecification) processMethod2(api *APIGroup, pathItem *spec.PathItem
 				os.Exit(1)
 			}
 			var body map[string]interface{}
-			p.Resource, body, p.IsArray = c.resourceFromSchema(param.Schema, method, nil, true)
+			p.Resource, body, p.IsArray = c.resourceFromSchema2(param.Schema, method, nil, true)
 			p.Resource.Schema = jsonResourceToString(body, p.IsArray)
 			p.Resource.origin = RequestBody
 			method.BodyParam = &p
@@ -943,14 +984,14 @@ func (c *APISpecification) processMethod2(api *APIGroup, pathItem *spec.PathItem
 				c.ResourceList[version] = make(map[string]*Resource)
 			}
 		}
-		rsp := c.buildResponse(&response, method, version)
+		rsp := c.buildResponse2(&response, method, version)
 		(*rsp).StatusDescription = HTTPStatusDescription(status)
 		method.Responses[status] = *rsp
 
 	}
 
 	if o.Responses.Default != nil {
-		rsp := c.buildResponse(o.Responses.Default, method, version)
+		rsp := c.buildResponse2(o.Responses.Default, method, version)
 		method.DefaultResponse = rsp
 	}
 
@@ -1039,9 +1080,9 @@ func (c *APISpecification) processMethod3(api *APIGroup, pathItem *openapi3.Path
 			Description: string(github_flavored_markdown.Markdown([]byte(param.Value.Description))),
 			Required:    param.Value.Required,
 		}
-		// TODO
-		//p.setType(param)
-		//p.setEnums(param)
+
+		p.setType3(param.Value)
+		p.setEnums3(param.Value)
 
 		switch strings.ToLower(param.Value.In) {
 		case "formdata":
@@ -1054,8 +1095,8 @@ func (c *APISpecification) processMethod3(api *APIGroup, pathItem *openapi3.Path
 				os.Exit(1)
 			}
 			var body map[string]interface{}
-			// TODO
-			//p.Resource, body, p.IsArray = c.resourceFromSchema(param.Schema, method, nil, true)
+			// TODO request body
+			p.Resource, body, p.IsArray = c.resourceFromSchema3(param.Value.Schema.Value, p.Name, method, nil, true)
 			p.Resource.Schema = jsonResourceToString(body, p.IsArray)
 			p.Resource.origin = RequestBody
 			method.BodyParam = &p
@@ -1074,36 +1115,44 @@ func (c *APISpecification) processMethod3(api *APIGroup, pathItem *openapi3.Path
 		os.Exit(1)
 	}
 
-	/*	TODO
 	// FIXME - Dies if there are no responses...
-		for status, response := range o.Responses.StatusCodeResponses {
-			logger.Tracef(nil, "Response for status %d", status)
-			//spew.Dump(response)
+	for status, response := range o.Responses {
+		logger.Tracef(nil, "Response for status %d", status)
+		//spew.Dump(response)
+		logger.Infof(nil, response.Ref)
 
-			// Discover if the resource is already declared, and pick it up
-			// if it is (keyed on version number)
-			if response.Schema != nil {
-				if _, ok := c.ResourceList[version]; !ok {
-					c.ResourceList[version] = make(map[string]*Resource)
-				}
+		hasSchema := false
+		for contentType, mediaType := range response.Value.Content {
+			logger.Debugf(nil, contentType)
+			logger.Debugf(nil, mediaType.Schema.Value.Type)
+			hasSchema = true
+		}
+
+		// Discover if the resource is already declared, and pick it up
+		// if it is (keyed on version number)
+		if hasSchema {
+			if _, ok := c.ResourceList[version]; !ok {
+				c.ResourceList[version] = make(map[string]*Resource)
 			}
-			rsp := c.buildResponse(&response, method, version)
-			(*rsp).StatusDescription = HTTPStatusDescription(status)
-			method.Responses[status] = *rsp
-
 		}
+		rsp := c.buildResponse3(response.Value, method, version)
+		iStatus, _ := strconv.Atoi(status)
+		(*rsp).StatusDescription = HTTPStatusDescription(iStatus)
+		method.Responses[iStatus] = *rsp
 
-		if o.Responses.Default != nil {
-			rsp := c.buildResponse(o.Responses.Default, method, version)
-			method.DefaultResponse = rsp
-		}
-	*/
+	}
+
+	//if o.Responses.Default != nil {
+	//	rsp := c.buildResponse3(o.Responses.Default().Value, method, version)
+	//	method.DefaultResponse = rsp
+	//}
+
 	return method
 }
 
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) buildResponse(resp *spec.Response, method *Method, version string) *Response {
+func (c *APISpecification) buildResponse2(resp *spec.Response, method *Method, version string) *Response {
 	var response *Response
 
 	if resp != nil {
@@ -1113,7 +1162,7 @@ func (c *APISpecification) buildResponse(resp *spec.Response, method *Method, ve
 		var example_json map[string]interface{}
 
 		if resp.Schema != nil {
-			r, example_json, is_array = c.resourceFromSchema(resp.Schema, method, nil, false)
+			r, example_json, is_array = c.resourceFromSchema2(resp.Schema, method, nil, false)
 
 			if r != nil {
 				r.Schema = jsonResourceToString(example_json, false)
@@ -1129,6 +1178,46 @@ func (c *APISpecification) buildResponse(resp *spec.Response, method *Method, ve
 		method.Resources = append(method.Resources, response.Resource) // Add the resource to the method which uses it
 
 		response.compileHeaders(resp)
+	}
+	return response
+}
+
+func (c *APISpecification) buildResponse3(resp *openapi3.Response, method *Method, version string) *Response {
+	var response *Response
+
+	if resp != nil {
+		var vres *Resource
+		var r *Resource
+		var is_array bool
+		var example_json map[string]interface{}
+
+		// get the first content type available
+
+		var schema *openapi3.Schema
+		var name string
+		for _, mediaType := range resp.Content {
+			schema = mediaType.Schema.Value
+			name = mediaType.Schema.Ref
+			break
+		}
+
+		if schema != nil {
+			r, example_json, is_array = c.resourceFromSchema3(schema, name, method, nil, false)
+
+			if r != nil {
+				r.Schema = jsonResourceToString(example_json, false)
+				r.origin = MethodResponse
+				vres = c.crossLinkMethodAndResource(r, method, version)
+			}
+		}
+		response = &Response{
+			Description: string(github_flavored_markdown.Markdown([]byte(resp.Description))),
+			Resource:    vres,
+			IsArray:     is_array,
+		}
+		method.Resources = append(method.Resources, response.Resource) // Add the resource to the method which uses it
+
+		//response.compileHeaders(resp)
 	}
 	return response
 }
@@ -1324,7 +1413,7 @@ func jsonResourceToString(jsonres map[string]interface{}, is_array bool) string 
 
 // -----------------------------------------------------------------------------
 
-func checkPropertyType(s *spec.Schema) string {
+func checkPropertyType2(s *spec.Schema) string {
 
 	/*
 	   (string) (len=12) "string_array": (spec.Schema) {
@@ -1378,15 +1467,67 @@ func checkPropertyType(s *spec.Schema) string {
 	return ptype
 }
 
+func checkPropertyType3(s *openapi3.Schema) string {
+
+	/*
+	   (string) (len=12) "string_array": (spec.Schema) {
+	    SchemaProps: (spec.SchemaProps) {
+	     Description: (string) (len=16) "Array of strings",
+	     Type: (spec.StringOrArray) (len=1 cap=1) { (string) (len=5) "array" },
+	     Items: (*spec.SchemaOrArray)(0xc8205bb000)({
+	      Schema: (*spec.Schema)(0xc820202480)({
+	       SchemaProps: (spec.SchemaProps) {
+	        Type: (spec.StringOrArray) (len=1 cap=1) { (string) (len=6) "string" },
+	       },
+	      }),
+	     }),
+	    },
+	   }
+	*/
+
+	sOrig := s.Type
+
+	pType := s.Type
+
+	if s.Type == "" {
+		pType = "object"
+	}
+
+	if s.Items != nil {
+		pType = "UNKNOWN"
+
+		if s.Type == "array" {
+
+			if s.Items != nil {
+				s = s.Items.Value
+			}
+
+			if s.Type == "nil" {
+				pType = "array of objects"
+				if s.Properties != nil {
+					pType = "array of SOMETHING"
+				}
+			} else {
+				pType = fmt.Sprintf("%s", sOrig)
+			}
+		} else {
+			pType = "Some object"
+		}
+
+	}
+
+	return pType
+}
+
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) resourceFromSchema(s *spec.Schema, method *Method, fqNS []string, isRequestResource bool) (*Resource, map[string]interface{}, bool) {
+func (c *APISpecification) resourceFromSchema2(s *spec.Schema, method *Method, fqNS []string, isRequestResource bool) (*Resource, map[string]interface{}, bool) {
 	if s == nil {
 		return nil, nil, false
 	}
 
-	stype := checkPropertyType(s)
-	logger.Tracef(nil, "resourceFromSchema: Schema type: %s\n", stype)
+	stype := checkPropertyType2(s)
+	logger.Tracef(nil, "resourceFromSchema2: Schema type: %s\n", stype)
 	logger.Tracef(nil, "FQNS: %s\n", fqNS)
 	logger.Tracef(nil, "CHECK schema type and items\n")
 	//spew.Dump(s)
@@ -1541,16 +1682,138 @@ func (c *APISpecification) resourceFromSchema(s *spec.Schema, method *Method, fq
 	required := make(map[string]bool)
 	json_representation := make(map[string]interface{})
 
-	logger.Tracef(nil, "Call compileproperties...\n")
-	c.compileproperties(s, r, method, id, required, json_representation, myFQNS, chopped, isRequestResource)
+	logger.Tracef(nil, "Call compileproperties2...\n")
+	c.compileproperties2(s, r, method, id, required, json_representation, myFQNS, chopped, isRequestResource)
 
 	for allof := range s.AllOf {
-		c.compileproperties(&s.AllOf[allof], r, method, id, required, json_representation, myFQNS, chopped, isRequestResource)
+		c.compileproperties2(&s.AllOf[allof], r, method, id, required, json_representation, myFQNS, chopped, isRequestResource)
 	}
 
-	logger.Tracef(nil, "resourceFromSchema done\n")
+	logger.Tracef(nil, "resourceFromSchema2 done\n")
 
 	return r, json_representation, is_array
+}
+
+func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, method *Method, fqNS []string, isRequestResource bool) (*Resource, map[string]interface{}, bool) {
+	if s == nil {
+		return nil, nil, false
+	}
+
+	stype := checkPropertyType3(s)
+	logger.Tracef(nil, "resourceFromSchema3: Schema type: %s\n", stype)
+	logger.Tracef(nil, "FQNS: %s\n", fqNS)
+	logger.Tracef(nil, "CHECK schema type and items\n")
+
+	originalS := s
+
+	if s.Type == "" {
+		s.Type = "object"
+	}
+
+	id := TitleToKebab(s.Type)
+
+	if len(fqNS) == 0 && id == "" {
+		logger.Errorf(nil, "Error: %s %s references a model definition that does not have a title member.", strings.ToUpper(method.Method), method.Path)
+		os.Exit(1)
+	}
+
+	// Ignore ID (from title element) for all but child-objects...
+	// This prevents the title-derived ID being added onto the end of the FQNS.property as
+	// FQNS.property.ID, if title is given for the property in the spec.
+	if len(fqNS) > 0 && !(s.Type == "object") {
+		id = ""
+	}
+
+	var is_array bool
+	if s.Type == "array" {
+		fqNSlen := len(fqNS)
+		if fqNSlen > 0 {
+			fqNS = append(fqNS[0:fqNSlen-1], fqNS[fqNSlen-1]+"[]")
+		}
+		is_array = true
+	}
+
+	myFQNS := fqNS
+	var chopped bool
+
+	if len(id) == 0 && len(myFQNS) > 0 {
+		id = myFQNS[len(myFQNS)-1]
+		myFQNS = append([]string{}, myFQNS[0:len(myFQNS)-1]...)
+		chopped = true
+		logger.Tracef(nil, "Chopped %s from myFQNS leaving %s\n", id, myFQNS)
+	}
+
+	resourceFQNS := myFQNS
+	// If we are dealing with an object, then adjust the resource FQNS and id
+	// so that the last element of the FQNS is chopped off and used as the ID
+	if !chopped && s.Type == "object" {
+		if len(resourceFQNS) > 0 {
+			id = resourceFQNS[len(resourceFQNS)-1]
+			resourceFQNS = resourceFQNS[:len(resourceFQNS)-1]
+			logger.Tracef(nil, "Got an object, so slicing %s from resourceFQNS leaving %s\n", id, myFQNS)
+		}
+	}
+
+	// If there is no description... the case where we have an array of objects. See issue/11
+	var description string
+	if originalS.Description != "" {
+		description = string(github_flavored_markdown.Markdown([]byte(originalS.Description)))
+	} else {
+		description = originalS.Type
+	}
+
+	logger.Tracef(nil, "Create resource %s [%s]\n", id, s.Type)
+	if is_array {
+		logger.Tracef(nil, "- Is Arrays\n")
+	}
+
+	r := &Resource{
+		ID:          id,
+		Title:       s.Type,
+		Description: description,
+		Type:        []string{s.Type},
+		Properties:  make(map[string]*Resource),
+		FQNS:        resourceFQNS,
+	}
+
+	if s.Example != nil {
+		example, err := JSONMarshalIndent(&s.Example)
+		if err != nil {
+			logger.Errorf(nil, "Error encoding example json: %s", err)
+		}
+		r.Example = string(example)
+	}
+
+	if len(s.Enum) > 0 {
+		for _, e := range s.Enum {
+			r.Enum = append(r.Enum, fmt.Sprintf("%s", e))
+		}
+	}
+
+	r.ReadOnly = originalS.ReadOnly
+	if ops, ok := originalS.Extensions["x-excludeFromOperations"].([]interface{}); ok && isRequestResource {
+		// Mark resource property as being excluded from operations with this name.
+		// This filtering only takes effect in a request body, just like readOnly, so when isRequestResource is true
+		for _, op := range ops {
+			if c, ok := op.(string); ok {
+				r.ExcludeFromOperations = append(r.ExcludeFromOperations, c)
+			}
+		}
+	}
+
+	required := make(map[string]bool)
+	jsonRepresentations := make(map[string]interface{})
+
+	logger.Tracef(nil, "Call compileproperties2...\n")
+	c.compileproperties3(s, r, method, id, required, jsonRepresentations, myFQNS, chopped, isRequestResource)
+
+	for allof := range s.AllOf {
+		c.compileproperties3(s.AllOf[allof].Value, r, method, id, required, jsonRepresentations, myFQNS, chopped, isRequestResource)
+	}
+
+	logger.Tracef(nil, "resourceFromSchema2 done\n")
+
+	return r, jsonRepresentations, is_array
 }
 
 // -----------------------------------------------------------------------------
@@ -1558,7 +1821,7 @@ func (c *APISpecification) resourceFromSchema(s *spec.Schema, method *Method, fq
 // It uses the 'required' map to set when properties are required and builds a JSON
 // representation of the resource.
 //
-func (c *APISpecification) compileproperties(s *spec.Schema, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
+func (c *APISpecification) compileproperties2(s *spec.Schema, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
 
 	// First, grab the required members
 	for _, n := range s.Required {
@@ -1566,7 +1829,7 @@ func (c *APISpecification) compileproperties(s *spec.Schema, r *Resource, method
 	}
 
 	for name, property := range s.Properties {
-		c.processProperty(&property, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
+		c.processProperty2(&property, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
 	}
 
 	// Special case to deal with AdditionalProperties (which really just boils down to declaring a
@@ -1576,21 +1839,42 @@ func (c *APISpecification) compileproperties(s *spec.Schema, r *Resource, method
 		ap := s.AdditionalProperties.Schema
 		ap.Type = spec.StringOrArray([]string{"map", ap.Type[0]}) // massage type so that it is a map of 'type'
 
-		c.processProperty(ap, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
+		c.processProperty2(ap, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
+	}
+}
+
+func (c *APISpecification) compileproperties3(s *openapi3.Schema, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
+
+	// First, grab the required members
+	for _, n := range s.Required {
+		required[n] = true
+	}
+
+	for name, property := range s.Properties {
+		c.processProperty3(property.Value, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
+	}
+
+	// Special case to deal with AdditionalProperties (which really just boils down to declaring a
+	// map of 'type' (string, int, object etc).
+	if s.AdditionalProperties != nil {
+		name := "<key>"
+		ap := s.AdditionalProperties.Value
+
+		c.processProperty3(ap, name, r, method, id, required, json_rep, myFQNS, chopped, isRequestResource)
 	}
 }
 
 // -----------------------------------------------------------------------------
 
-func (c *APISpecification) processProperty(s *spec.Schema, name string, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
+func (c *APISpecification) processProperty2(s *spec.Schema, name string, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
 
 	newFQNS := prepareNamespace(myFQNS, id, name, chopped)
 
 	var json_resource map[string]interface{}
 	var resource *Resource
 
-	logger.Tracef(nil, "A call resourceFromSchema for property %s\n", name)
-	resource, json_resource, _ = c.resourceFromSchema(s, method, newFQNS, isRequestResource)
+	logger.Tracef(nil, "A call resourceFromSchema2 for property %s\n", name)
+	resource, json_resource, _ = c.resourceFromSchema2(s, method, newFQNS, isRequestResource)
 
 	skip := isRequestResource && resource.ReadOnly
 	if !skip && resource.ExcludeFromOperations != nil {
@@ -1627,7 +1911,7 @@ func (c *APISpecification) processProperty(s *spec.Schema, name string, r *Resou
 					// if the array member references an object or a primitive type
 					r.Properties[name].Description = string(github_flavored_markdown.Markdown([]byte(s.Description)))
 
-					// If here, we have no json_resource returned from resourceFromSchema, then the property
+					// If here, we have no json_resource returned from resourceFromSchema2, then the property
 					// is an array of primitive, so construct either an array of string or array of object
 					// as appropriate.
 					if len(json_resource) > 0 {
@@ -1637,7 +1921,104 @@ func (c *APISpecification) processProperty(s *spec.Schema, name string, r *Resou
 					} else {
 						var array_obj []string
 						// We stored the real type of the primitive in Type array index 1 (see the note in
-						// resourceFromSchema). There is a special case of an array of object where EVERY
+						// resourceFromSchema2). There is a special case of an array of object where EVERY
+						// member of the object is read-only and filtered out due to isRequestResource being true.
+						// In this case, we will fall into this section of code, so we must check the length
+						// of the .Type array, as array len will be 1 [0] in this case, and 2 [1] for an array of
+						// primitives case.
+						// In the case where object members are readonly, the JSON produced will have a
+						// value of nil. This shouldn't happen often, as a more correct spec will declare the
+						// array member as readOnly!
+						//
+						if len(r.Properties[name].Type) > 1 {
+							// Got an array of primitives
+							array_obj = append(array_obj, r.Properties[name].Type[1])
+						}
+						json_rep[name] = array_obj
+					}
+				} else { // array and property.Items.Schema is NIL
+					var array_obj []map[string]interface{}
+					array_obj = append(array_obj, json_resource)
+					json_rep[name] = array_obj
+				}
+			} else { // array and Items are nil
+				var array_obj []map[string]interface{}
+				array_obj = append(array_obj, json_resource)
+				json_rep[name] = array_obj
+			}
+		} else if strings.ToLower(r.Properties[name].Type[0]) == "map" { // not array, so a map?
+			if strings.ToLower(r.Properties[name].Type[1]) == "object" {
+				json_rep[name] = json_resource // A map of objects
+			} else {
+				json_rep[name] = r.Properties[name].Type[1] // map of primitive
+			}
+		} else {
+			// We're NOT an array, map or object, so a primitive
+			json_rep[name] = r.Properties[name].Type[0]
+		}
+	} else {
+		// We're an object
+		json_rep[name] = json_resource
+	}
+	return
+}
+
+func (c *APISpecification) processProperty3(s *openapi3.Schema, name string, r *Resource, method *Method, id string, required map[string]bool, json_rep map[string]interface{}, myFQNS []string, chopped bool, isRequestResource bool) {
+
+	newFQNS := prepareNamespace(myFQNS, id, name, chopped)
+
+	var json_resource map[string]interface{}
+	var resource *Resource
+
+	logger.Tracef(nil, "A call resourceFromSchema2 for property %s\n", name)
+	resource, json_resource, _ = c.resourceFromSchema3(s, name, method, newFQNS, isRequestResource)
+
+	skip := isRequestResource && resource.ReadOnly
+	if !skip && resource.ExcludeFromOperations != nil {
+
+		logger.Tracef(nil, "Exclude [%s] in operation [%s] if in list: %s\n", name, method.OperationName, resource.ExcludeFromOperations)
+
+		for _, opname := range resource.ExcludeFromOperations {
+			if opname == method.OperationName {
+				logger.Tracef(nil, "[%s] is excluded\n", name)
+				skip = true
+				break
+			}
+		}
+	}
+	if skip {
+		return
+	}
+
+	r.Properties[name] = resource
+	json_rep[name] = json_resource
+
+	if _, ok := required[name]; ok {
+		r.Properties[name].Required = true
+	}
+	logger.Tracef(nil, "resource property %s type: %s\n", name, r.Properties[name].Type[0])
+
+	if strings.ToLower(r.Properties[name].Type[0]) != "object" {
+		// Arrays of objects need to be handled as a special case
+		if strings.ToLower(r.Properties[name].Type[0]) == "array" {
+			logger.Tracef(nil, "Processing an array property %s", name)
+			if s.Items != nil {
+				if s.Items.Value != nil {
+					// Some outputs (example schema, member description) are generated differently
+					// if the array member references an object or a primitive type
+					r.Properties[name].Description = string(github_flavored_markdown.Markdown([]byte(s.Description)))
+
+					// If here, we have no json_resource returned from resourceFromSchema2, then the property
+					// is an array of primitive, so construct either an array of string or array of object
+					// as appropriate.
+					if len(json_resource) > 0 {
+						var array_obj []map[string]interface{}
+						array_obj = append(array_obj, json_resource)
+						json_rep[name] = array_obj
+					} else {
+						var array_obj []string
+						// We stored the real type of the primitive in Type array index 1 (see the note in
+						// resourceFromSchema2). There is a special case of an array of object where EVERY
 						// member of the object is read-only and filtered out due to isRequestResource being true.
 						// In this case, we will fall into this section of code, so we must check the length
 						// of the .Type array, as array len will be 1 [0] in this case, and 2 [1] for an array of

@@ -27,7 +27,7 @@ func TestLoadsSwagger2(t *testing.T) {
 
 func TestLoadsOpenAPI3(t *testing.T) {
 
-	const openAPI3SpecFile = "../examples/specifications/refdata/swagger.yml"
+	const openAPI3SpecFile = "../examples/specifications/petstore3/swagger.json"
 
 	swagger2Doc, _ := loads.JSONSpec(openAPI3SpecFile)
 
@@ -43,10 +43,10 @@ func TestLoadsOpenAPI3(t *testing.T) {
 		t.Error(`Failed to load spec` + err.Error())
 	}
 
-	if specification.ID != "reference-data-service-api" {
+	if specification.ID != "swagger-petstore3" {
 		t.Error(`ID fail`)
 	}
-	if specification.APIInfo.Title != "Reference Data Service API" {
+	if specification.APIInfo.Title != "Swagger Petstore3" {
 		t.Error(`APIInfo.Title fail`)
 	}
 
