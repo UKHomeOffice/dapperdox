@@ -1704,13 +1704,54 @@ func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, 
 	logger.Tracef(nil, "FQNS: %s\n", fqNS)
 	logger.Tracef(nil, "CHECK schema type and items\n")
 
-	originalS := s
+	rType := spec.StringOrArray([]string{})
+	rType = append(rType, s.Type)
 
-	if s.Type == "" {
-		s.Type = "object"
+	if rType == nil {
+		rType = append(rType, s.Type)
 	}
 
-	id := TitleToKebab(s.Type)
+	title := s.Type
+
+	originalS := s
+	if s.Items != nil {
+		stringorarray := rType
+
+		// Jump to nearest schema for items, depending on how it was declared
+		if s.Items.Value.Properties != nil { // items: { properties: {} }
+			s = s.Items.Value
+			rType = append(rType, s.Type)
+			title = createTitle(s.Items, s.Type)
+			logger.Tracef(nil, "got s.Items.Schema for %s\n", title)
+		}
+
+		if rType == nil {
+			title = createTitle(s.Items, s.Type)
+			logger.Tracef(nil, "Got array of objects or object. Name %s\n", title)
+			rType = stringorarray // Put back original type
+		} else if rType.Contains("array") {
+			title = createTitle(s.Items, s.Type)
+			logger.Tracef(nil, "Got array for %s\n", title)
+			rType = stringorarray // Put back original type
+		} else if stringorarray.Contains("array") && len(s.Properties) == 0 {
+			// if we get here then we can assume the type is supposed to be an array of primitives
+			// Store the actual primitive type in the second element of the Type array.
+			rType = spec.StringOrArray([]string{"array", s.Type})
+		} else {
+			rType = stringorarray // Put back original type
+			logger.Tracef(nil, "putting s.Type back\n")
+		}
+		logger.Tracef(nil, "REMAP SCHEMA (Type is now %s)\n", s.Type)
+	}
+
+	if len(s.Format) > 0 {
+		rType[len(rType)-1] = s.Format
+	}
+
+	if name != "" {
+		title = name
+	}
+	id := TitleToKebab(title)
 
 	if len(fqNS) == 0 && id == "" {
 		logger.Errorf(nil, "Error: %s %s references a model definition that does not have a title member.", strings.ToUpper(method.Method), method.Path)
@@ -1720,12 +1761,12 @@ func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, 
 	// Ignore ID (from title element) for all but child-objects...
 	// This prevents the title-derived ID being added onto the end of the FQNS.property as
 	// FQNS.property.ID, if title is given for the property in the spec.
-	if len(fqNS) > 0 && !(s.Type == "object") {
+	if len(fqNS) > 0 && !rType.Contains("object") {
 		id = ""
 	}
 
 	var is_array bool
-	if s.Type == "array" {
+	if strings.ToLower(rType[0]) == "array" {
 		fqNSlen := len(fqNS)
 		if fqNSlen > 0 {
 			fqNS = append(fqNS[0:fqNSlen-1], fqNS[fqNSlen-1]+"[]")
@@ -1746,7 +1787,7 @@ func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, 
 	resourceFQNS := myFQNS
 	// If we are dealing with an object, then adjust the resource FQNS and id
 	// so that the last element of the FQNS is chopped off and used as the ID
-	if !chopped && s.Type == "object" {
+	if !chopped && rType.Contains("object") {
 		if len(resourceFQNS) > 0 {
 			id = resourceFQNS[len(resourceFQNS)-1]
 			resourceFQNS = resourceFQNS[:len(resourceFQNS)-1]
@@ -1759,19 +1800,19 @@ func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, 
 	if originalS.Description != "" {
 		description = string(github_flavored_markdown.Markdown([]byte(originalS.Description)))
 	} else {
-		description = originalS.Type
+		description = title
 	}
 
-	logger.Tracef(nil, "Create resource %s [%s]\n", id, s.Type)
+	logger.Tracef(nil, "Create resource %s [%s]\n", id, title)
 	if is_array {
 		logger.Tracef(nil, "- Is Arrays\n")
 	}
 
 	r := &Resource{
 		ID:          id,
-		Title:       s.Type,
+		Title:       title,
 		Description: description,
-		Type:        []string{s.Type},
+		Type:        rType,
 		Properties:  make(map[string]*Resource),
 		FQNS:        resourceFQNS,
 	}
@@ -1814,6 +1855,16 @@ func (c *APISpecification) resourceFromSchema3(s *openapi3.Schema, name string, 
 	logger.Tracef(nil, "resourceFromSchema2 done\n")
 
 	return r, jsonRepresentations, is_array
+}
+
+func createTitle(schema *openapi3.SchemaRef, stype string) string {
+	if stype != "" {
+		return stype
+	} else if schema.Ref != "" {
+		return schema.Ref
+	} else {
+		return "object"
+	}
 }
 
 // -----------------------------------------------------------------------------
