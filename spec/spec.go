@@ -370,12 +370,12 @@ func (c *APISpecification) LoadSwagger2(swagger2Doc *loads.Document) error {
 
 	c.ID = TitleToKebab(c.APIInfo.Title)
 
-	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
+	methodNavByName := true // Should methods in the navigation be presented by type (GET, POST) or name (string)?
 	if byname, ok := swagger2Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
 		methodNavByName = byname
 	}
 
-	var methodSortBy []string
+	methodSortBy := []string{"path", "operation"}
 	if sortByList, ok := swagger2Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
 		for _, sortBy := range sortByList {
 			keyname := sortBy.(string)
@@ -529,12 +529,12 @@ func (c *APISpecification) LoadOpenAPI3(swagger2Doc *loads.Document, openAPI3Spe
 
 	c.ID = TitleToKebab(c.APIInfo.Title)
 
-	methodNavByName := false // Should methods in the navigation be presented by type (GET, POST) or name (string)?
+	methodNavByName := true // Should methods in the navigation be presented by type (GET, POST) or name (string)?
 	if byname, ok := openAPI3Spec.Extensions["x-navigateMethodsByName"].(bool); ok {
 		methodNavByName = byname
 	}
 
-	var methodSortBy []string
+	methodSortBy := []string{"path", "operation"}
 	if sortByList, ok := openAPI3Spec.Extensions["x-sortMethodsBy"].([]interface{}); ok {
 		for _, sortBy := range sortByList {
 			keyname := sortBy.(string)
