@@ -290,11 +290,11 @@ func LoadSpecifications(specHost string, collapse bool) error {
 			specification = &APISpecification{}
 		}
 
-		specification.URL = specLocation
-
 		if isLocalSpecUrl(specLocation) && !strings.HasPrefix(specLocation, "/") {
 			specLocation = "/" + specLocation
 		}
+
+		specification.URL = specLocation
 
 		location, err := url.Parse(normalizeSpecLocation(specLocation, specHost))
 		if err != nil {
