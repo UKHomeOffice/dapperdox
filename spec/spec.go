@@ -1197,7 +1197,7 @@ func (c *APISpecification) buildResponse3(resp *openapi3.Response, method *Metho
 		var name string
 		for _, mediaType := range resp.Content {
 			schema = mediaType.Schema.Value
-			name = mediaType.Schema.Ref
+			name = parseSchemaRef(mediaType.Schema.Ref)
 			break
 		}
 
@@ -1220,6 +1220,13 @@ func (c *APISpecification) buildResponse3(resp *openapi3.Response, method *Metho
 		//response.compileHeaders(resp)
 	}
 	return response
+}
+
+func parseSchemaRef(schemaRef string) string {
+	if len(schemaRef) < 21 {
+		return schemaRef
+	}
+	return schemaRef[21:]
 }
 
 // -----------------------------------------------------------------------------
