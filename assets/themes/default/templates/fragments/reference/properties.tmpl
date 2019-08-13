@@ -2,6 +2,10 @@
   <tr>
     <td class="resource">
       {{ if $property.FQNS }}<span class="object">{{ join $property.FQNS "." }}</span>.{{ end }}{{ $property.ID }}
+      <p/>
+      <div style="height:100px;width:600px;border:1px solid #ccc;font:16px/26px Courier, monospace;overflow:auto;">
+        <pre><code>{{ $property.Example }}</code></pre>
+      </div>
     </td>
     <!-- <td class="type">{{ index $property.Type 0 }}</td> -->
     <td class="type">{{ join $property.Type " of " }}</td>
