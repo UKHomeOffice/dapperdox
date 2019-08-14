@@ -8,7 +8,7 @@
 
 <h2 class="sub-header">Request</h2>
 {{ if .Method.Deprecated }}
-  <pre><strike>{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</strike> (Deprecated) </pre>
+  <pre><span style="text-decoration: line-through;">{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</span> (Deprecated) </pre>
 {{ else }}
   <pre>{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</pre>
 {{ end }}
