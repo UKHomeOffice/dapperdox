@@ -154,6 +154,7 @@ type Method struct {
 	Security        map[string]Security
 	APIGroup        *APIGroup
 	SortKey         string
+	Deprecated      bool
 }
 
 // Parameter represents an API method parameter
@@ -1046,6 +1047,7 @@ func (c *APISpecification) processMethod3(api *APIGroup, pathItem *openapi3.Path
 		OperationName:  operationName,
 		APIGroup:       api,
 		SortKey:        sortkey,
+		Deprecated:     o.Deprecated,
 	}
 
 	// If Tagging is not used by spec to select, group and order API paths to document, then

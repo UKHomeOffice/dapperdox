@@ -7,8 +7,11 @@
 {{ overlay "description" . }}
 
 <h2 class="sub-header">Request</h2>
-
-<pre>{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</pre>
+{{ if .Method.Deprecated }}
+  <pre><strike>{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</strike> (Deprecated) </pre>
+{{ else }}
+  <pre>{{ uc .Method.Method }} {{ .API.URL }}{{ .Method.Path }}</pre>
+{{ end }}
 {{ overlay "request" . }}
 
 {{ if .Method.PathParams }}
